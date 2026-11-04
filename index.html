@@ -95,7 +95,7 @@ footer { text-align: center; font-size: 12px; color: var(--muted); }
   </header>
 
   <nav aria-label="Categorias">
-    <a href="#lanches">Lanches</a><a href="#bowls">Bowls</a><a href="#doces">Doces</a>
+    <a href="#destaque">Destaque</a><a href="#lanches">Lanches</a><a href="#bowls">Bowls</a><a href="#doces">Doces</a>
   </nav>
 
   <main id="menu" style="display:grid;gap:22px"></main>
@@ -112,6 +112,9 @@ footer { text-align: center; font-size: 12px; color: var(--muted); }
 <script>
 const MESA = "07";
 const DISHES = [
+  { id: "meu-arquivo", cat: "destaque", catName: "Destaque", name: "Meu arquivo", price: 49.9,
+    desc: "Troque este texto pela descrição do seu produto.",
+    specs: ["30 cm"], alt: "Meu produto em 3D" },
   { id: "hamburguer", cat: "lanches", catName: "Lanches", name: "X-Lume da casa", price: 34.9,
     desc: "Blend bovino de 160 g, cheddar, alface americana, tomate e pão brioche com gergelim.",
     specs: ["Ø 11 cm", "320 g", "Serve 1"], alt: "Hambúrguer com queijo, alface e tomate em 3D" },

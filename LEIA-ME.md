@@ -19,3 +19,9 @@ A RA só funciona com o site publicado em HTTPS e aberto no celular:
 - Colocar o número do restaurante no link do WhatsApp (`https://wa.me/55DDDNUMERO?text=`).
 - Ler o número da mesa pelo QR Code (ex.: `?mesa=07`).
 - Painel para o restaurante editar pratos e preços.
+
+## Atalho
+
+  { id: "NOME-DO-ARQUIVO", cat: "destaque", catName: "Destaque", name: "Nome que aparece no cardápio", price: 49.9,
+    desc: "Descrição curta do produto.",
+    specs: ["30 cm", "Serve 1"], alt: "Descrição do produto em 3D" },
