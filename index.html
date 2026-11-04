@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cardápio Mesa 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>
+/* Layout: coluna única de celular; cada prato tem um "palco" 3D sobre a mesa, depois nome, medidas e botão; barra de pedido fixa embaixo */
+:root {
+  --bg: #eef2ef;
+  --surface: #ffffff;
+  --stage: #dfe6e1;
+  --stage-edge: #cfd8d2;
+  --ink: #15211c;
+  --muted: #586660;
+  --line: #d6ddd8;
+  --accent: #e3a50c;
+  --accent-ink: #1d1606;
+  --wa: #1f8f52;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1412; --surface: #161e1b; --stage: #1c2622; --stage-edge: #25312c; --ink: #edf2ee; --muted: #9aa9a2;
+  --line: #27322d; --accent: #f0b42a; --accent-ink: #1d1606; --wa: #2fae69; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1412; --surface: #161e1b; --stage: #1c2622; --stage-edge: #25312c; --ink: #edf2ee; --muted: #9aa9a2;
+  --line: #27322d; --accent: #f0b42a; --accent-ink: #1d1606; --wa: #2fae69; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 120px; display: grid; gap: 22px; }
+
+header { display: grid; gap: 10px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.brand span { color: var(--accent); }
+.table-chip { font-weight: 700; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid var(--ink); border-radius: 999px; padding: 4px 12px; font-variant-numeric: tabular-nums; }
+.sub { color: var(--muted); margin: 0; }
+.note { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 0; }
+.note b { color: var(--ink); font-weight: 600; }
+.note i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; }
+
+nav { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+nav a { flex: none; text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; padding: 7px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+nav a:focus-visible, button:focus-visible, .wa:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 8px 0 -8px; }
+
+.dish { background: var(--surface); border-radius: 20px; overflow: hidden; border: 1px solid var(--line); display: grid; }
+.stage { position: relative; aspect-ratio: 4 / 3; max-width: 100%; background: radial-gradient(120% 90% at 50% 75%, var(--stage-edge) 0 36%, var(--stage) 37%); }
+model-viewer { width: 100%; height: 100%; --poster-color: transparent; --progress-bar-color: var(--accent); background: transparent; }
+.hint { position: absolute; left: 12px; top: 12px; font-size: 12px; font-weight: 600; background: var(--surface); color: var(--ink); border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line); pointer-events: none; }
+.ar-btn { position: absolute; right: 12px; bottom: 12px; border: 0; border-radius: 999px; padding: 9px 16px; font: 700 14px var(--font-body); background: var(--ink); color: var(--bg); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.ar-btn svg { width: 18px; height: 18px; }
+
+.info { padding: 16px 18px 18px; display: grid; gap: 10px; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.name { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; text-wrap: balance; min-width: 0; }
+.price { font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.desc { margin: 0; color: var(--muted); max-width: 60ch; }
+.specs { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; margin: 0; padding: 0; list-style: none; }
+.specs li::before { content: "·"; margin-right: 6px; color: var(--accent); font-weight: 800; }
+.specs li:first-child::before { content: none; }
+
+.qty { display: flex; align-items: center; gap: 4px; justify-self: start; }
+.add { border: 0; border-radius: 12px; padding: 11px 18px; font: 700 15px var(--font-body); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.step { width: 40px; height: 40px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: 700 20px var(--font-body); cursor: pointer; }
+.count { min-width: 36px; text-align: center; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding-top: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--surface); border-top: 1px solid var(--line); transform: translateY(110%); transition: transform .25s ease; }
+.bar.show { transform: none; }
+.bar-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sum { display: grid; line-height: 1.2; }
+.sum small { color: var(--muted); font-size: 13px; }
+.sum strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.wa { text-decoration: none; background: var(--wa); color: #fff; font-weight: 700; border-radius: 12px; padding: 12px 18px; white-space: nowrap; }
+footer { text-align: center; font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <h1 class="brand">Casa Lume<span>.</span></h1>
+      <span class="table-chip" id="mesa">Mesa 07</span>
+    </div>
+    <p class="sub">Lanches e doces · Gire cada prato com o dedo para ver de todos os lados.</p>
+    <p class="note" id="arNote"><i></i><span><b>Exemplo de cardápio.</b> Restaurante e pratos fictícios, com modelos 3D ilustrativos. O botão “Ver na sua mesa” aparece quando o cardápio está publicado no site do restaurante e aberto no celular.</span></p>
+  </header>
+
+  <nav aria-label="Categorias">
+    <a href="#lanches">Lanches</a><a href="#bowls">Bowls</a><a href="#doces">Doces</a>
+  </nav>
+
+  <main id="menu" style="display:grid;gap:22px"></main>
+  <footer>Protótipo Mesa 3D · cardápio com realidade aumentada</footer>
+</div>
+
+<div class="bar" id="bar" aria-live="polite">
+  <div class="bar-in">
+    <div class="sum"><small id="sumItems">0 itens</small><strong id="sumTotal">R$ 0,00</strong></div>
+    <a class="wa" id="wa" href="https://wa.me/" target="_blank" rel="noopener">Pedir no WhatsApp</a>
+  </div>
+</div>
+
+<script>
+const MESA = "07";
+const DISHES = [
+  { id: "hamburguer", cat: "lanches", catName: "Lanches", name: "X-Lume da casa", price: 34.9,
+    desc: "Blend bovino de 160 g, cheddar, alface americana, tomate e pão brioche com gergelim.",
+    specs: ["Ø 11 cm", "320 g", "Serve 1"], alt: "Hambúrguer com queijo, alface e tomate em 3D" },
+  { id: "acai", cat: "bowls", catName: "Bowls", name: "Açaí na tigela 500 ml", price: 26.0,
+    desc: "Açaí cremoso com banana, morango, granola crocante e hortelã.",
+    specs: ["Ø 14 cm", "500 ml", "Serve 1"], alt: "Tigela de açaí com frutas e granola em 3D" },
+  { id: "donut", cat: "doces", catName: "Doces", name: "Donut de morango", price: 12.5,
+    desc: "Massa fofinha, cobertura de morango e confeitos coloridos.",
+    specs: ["Ø 9 cm", "90 g"], alt: "Donut com cobertura rosa e confeitos em 3D" },
+  { id: "brigadeiro", cat: "doces", catName: "Doces", name: "Brigadeiro gourmet · 4 un.", price: 18.0,
+    desc: "Chocolate belga 50% cacau enrolado na hora, com granulado.",
+    specs: ["4 × 20 g", "Ø 2,7 cm cada"], alt: "Quatro brigadeiros em forminhas sobre uma tábua, em 3D" },
+];
+const brl = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const cart = {};
+const arIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M12 8l4 2v4l-4 2-4-2v-4z"/></svg>';
+
+const menu = document.getElementById("menu");
+let lastCat = null;
+DISHES.forEach(d => {
+  if (d.cat !== lastCat) {
+    const h = document.createElement("h2"); h.id = d.cat; h.textContent = d.catName; menu.appendChild(h); lastCat = d.cat;
+  }
+  const el = document.createElement("article");
+  el.className = "dish";
+  el.innerHTML = `
+    <div class="stage">
+      <model-viewer src="models/${d.id}.glb" alt="${d.alt}" camera-controls touch-action="pan-y"
+        auto-rotate auto-rotate-delay="0" rotation-per-second="18deg" interaction-prompt="none"
+        camera-orbit="25deg 68deg auto" shadow-intensity="1.1" shadow-softness="0.9" exposure="1.05"
+        ar ar-modes="webxr scene-viewer quick-look" ar-placement="floor" ar-scale="fixed" loading="lazy">
+        <button slot="ar-button" class="ar-btn">${arIcon}Ver na sua mesa</button>
+      </model-viewer>
+      <span class="hint">3D · gire com o dedo</span>
+    </div>
+    <div class="info">
+      <div class="row"><h3 class="name">${d.name}</h3><span class="price">${brl(d.price)}</span></div>
+      <p class="desc">${d.desc}</p>
+      <ul class="specs">${d.specs.map(s => `<li>${s}</li>`).join("")}</ul>
+      <div class="qty" id="q-${d.id}"></div>
+    </div>`;
+  menu.appendChild(el);
+  renderQty(d.id);
+  const mv = el.querySelector("model-viewer");
+  mv.addEventListener("load", () => { if (mv.canActivateAR) document.getElementById("arNote").hidden = true; });
+});
+
+function renderQty(id) {
+  const box = document.getElementById("q-" + id); const n = cart[id] || 0;
+  box.innerHTML = n === 0
+    ? `<button class="add" id="add-${id}" data-id="${id}" data-d="1">Adicionar</button>`
+    : `<button class="step" id="minus-${id}" data-id="${id}" data-d="-1" aria-label="Remover um">−</button>
+       <span class="count">${n}</span>
+       <button class="step" id="plus-${id}" data-id="${id}" data-d="1" aria-label="Adicionar mais um">+</button>`;
+}
+menu.addEventListener("click", e => {
+  const b = e.target.closest("button[data-id]"); if (!b) return;
+  const id = b.dataset.id; cart[id] = Math.max(0, (cart[id] || 0) + Number(b.dataset.d));
+  renderQty(id); updateBar();
+  const again = document.getElementById((cart[id] ? (b.dataset.d === "1" ? "plus-" : "minus-") : "add-") + id);
+  if (again) again.focus();
+});
+
+function updateBar() {
+  const items = DISHES.filter(d => cart[d.id]);
+  const count = items.reduce((s, d) => s + cart[d.id], 0);
+  const total = items.reduce((s, d) => s + cart[d.id] * d.price, 0);
+  document.getElementById("bar").classList.toggle("show", count > 0);
+  document.getElementById("sumItems").textContent = count === 1 ? "1 item" : `${count} itens`;
+  document.getElementById("sumTotal").textContent = brl(total);
+  const msg = [`Olá! Pedido da *Mesa ${MESA}*:`, ...items.map(d => `${cart[d.id]}× ${d.name} — ${brl(cart[d.id] * d.price)}`), `*Total: ${brl(total)}*`].join("\n");
+  document.getElementById("wa").href = "https://wa.me/?text=" + encodeURIComponent(msg);
+}
+</script>
+</body>
+</html>
