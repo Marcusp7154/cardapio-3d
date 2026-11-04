@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversor Mesa 3D</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>
+:root {
+  --bg: #eef2ef; --surface: #fff; --ink: #15211c; --muted: #586660; --line: #d6ddd8;
+  --accent: #e3a50c; --accent-ink: #1d1606; --ok: #1f8f52; --err: #c3342b; --stage: #dfe6e1;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0e1412; --surface: #161e1b; --ink: #edf2ee; --muted: #9aa9a2; --line: #27322d; --accent: #f0b42a; --stage: #1c2622; color-scheme: dark } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 980px; margin: 0 auto; padding: 28px 18px 48px; display: grid; gap: 20px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: 30px; margin: 0; letter-spacing: -0.02em; }
+h1 span { color: var(--accent); }
+.lead { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 20px; }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: grid; gap: 16px; align-content: start; }
+.drop { border: 2px dashed var(--line); border-radius: 14px; padding: 26px 14px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.drop b { display: block; font-size: 17px; }
+.drop small { color: var(--muted); }
+.files { font-size: 13px; color: var(--muted); margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.files li.ok::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+.files li.miss::before { content: "✕ "; color: var(--err); font-weight: 700; }
+label { font-weight: 600; font-size: 14px; display: grid; gap: 6px; }
+input[type=number], input[type=text] { font: inherit; padding: 9px 11px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; }
+.check input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--ok); }
+.check small { display: block; color: var(--muted); font-weight: 400; }
+.btn { font: 700 16px var(--font-body); border: 0; border-radius: 12px; padding: 13px; cursor: pointer; background: var(--accent); color: var(--accent-ink); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn.save { background: var(--ok); color: #fff; }
+.btn:focus-visible, .drop:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.stage { aspect-ratio: 4 / 3; border-radius: 14px; background: radial-gradient(120% 90% at 50% 75%, var(--line) 0 34%, var(--stage) 35%); position: relative; overflow: hidden; }
+model-viewer { width: 100%; height: 100%; background: transparent; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+.log { font-size: 13px; color: var(--muted); margin: 0; min-height: 1.5em; }
+.log.err { color: var(--err); }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; margin: 0; }
+.stats b { color: var(--ink); }
+.tips { font-size: 13px; color: var(--muted); margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Conversor Mesa 3D<span>.</span></h1>
+    <p class="lead">Transforma o escaneamento do KIRI Engine (OBJ + MTL + imagem) em um arquivo GLB pronto para o cardápio. Tira a mesa, endireita o produto e ajusta o tamanho real. Tudo roda no seu computador; nada é enviado para a internet.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-label="Configuração">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Escolher arquivos">
+        <b>Arraste aqui o .zip do KIRI</b>
+        <small>ou os 3 arquivos juntos (.obj, .mtl e .jpg) · clique para escolher</small>
+        <input type="file" id="pick" multiple accept=".zip,.obj,.mtl,.jpg,.jpeg,.png" hidden>
+      </div>
+      <ul class="files" id="files"></ul>
+
+      <div class="row">
+        <label for="size">Medida real (cm)
+          <input type="number" id="size" min="1" max="500" step="0.5" value="30">
+        </label>
+        <label for="axis">Medida de quê
+          <select id="axis" style="font:inherit;padding:9px 11px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)">
+            <option value="long">Lado mais comprido</option>
+            <option value="height">Altura</option>
+          </select>
+        </label>
+      </div>
+      <label for="name">Nome do arquivo
+        <input type="text" id="name" value="meu-produto" spellcheck="false">
+      </label>
+      <label class="check" for="table"><input type="checkbox" id="table" checked>
+        <span>Remover a mesa do escaneamento<small>Detecta a superfície plana embaixo do produto, apaga e deixa o produto reto.</small></span></label>
+      <label class="check" for="bits"><input type="checkbox" id="bits" checked>
+        <span>Remover pedaços soltos<small>Mantém só a peça principal.</small></span></label>
+
+      <button class="btn" id="go" disabled>Converter</button>
+      <p class="log" id="log" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-label="Resultado">
+      <div class="stage">
+        <model-viewer id="mv" camera-controls auto-rotate shadow-intensity="1" exposure="1.05" alt="Prévia do produto convertido"></model-viewer>
+        <div class="empty" id="empty">A prévia aparece aqui depois de converter.<br>Gire com o mouse para conferir todos os lados.</div>
+      </div>
+      <p class="stats" id="stats"></p>
+      <button class="btn save" id="save" disabled>Baixar GLB</button>
+      <ul class="tips">
+        <li>Se o produto ficou de cabeça para baixo ou sobrou parte da mesa, desmarque "Remover a mesa" e converta de novo.</li>
+        <li>Coloque o arquivo baixado na pasta <b>models</b> do cardápio e use o nome do arquivo (sem .glb) como <b>id</b> do produto.</li>
+        <li>Ideal: até 3 MB por arquivo para abrir rápido no celular.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script id="core">
+// ===== núcleo de conversão (sem DOM) =====
+function parseOBJ(text) {
+  const V = [], T = [], N = [], F = [];
+  for (const line of text.split(/\r?\n/)) {
+    const p = line.trim().split(/\s+/);
+    if (p[0] === "v") V.push([+p[1], +p[2], +p[3]]);
+    else if (p[0] === "vt") T.push([+p[1], +p[2]]);
+    else if (p[0] === "vn") N.push([+p[1], +p[2], +p[3]]);
+    else if (p[0] === "f") {
+      const idx = p.slice(1).map(q => { const s = q.split("/"); const r = (x, n) => { if (!x) return -1; const i = parseInt(x, 10); return i < 0 ? n + i : i - 1; };
+        return [r(s[0], V.length), r(s[1], T.length), r(s[2], N.length)]; });
+      for (let i = 1; i < idx.length - 1; i++) F.push([idx[0], idx[i], idx[i + 1]]);
+    }
+  }
+  return { V, T, N, F };
+}
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+
+function makeRand(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+function findTable(V, diag) {
+  const rnd = makeRand(12345), tol = diag * 0.0052; let best = { k: 0 };
+  for (let it = 0; it < 3000; it++) {
+    const a = V[Math.floor(rnd() * V.length)], b = V[Math.floor(rnd() * V.length)], c = V[Math.floor(rnd() * V.length)];
+    const n0 = cross(sub(b, a), sub(c, a)); const l = Math.hypot(...n0); if (l < 1e-12) continue;
+    const n = [n0[0] / l, n0[1] / l, n0[2] / l]; let k = 0;
+    for (let i = 0; i < V.length; i += 3) if (Math.abs(dot(sub(V[i], a), n)) < tol) k++;
+    if (k > best.k) best = { k, n, a };
+  }
+  let above = 0, below = 0;
+  for (const v of V) { const d = dot(sub(v, best.a), best.n); if (d > diag * 0.01) above++; else if (d < -diag * 0.01) below++; }
+  if (below > above) best.n = best.n.map(x => -x);
+  best.share = best.k * 3 / V.length;
+  return best;
+}
+function rotToUp(n) { // matriz que leva n até +Y
+  const y = [0, 1, 0], v = cross(n, y), s = Math.hypot(...v), c = dot(n, y);
+  if (s < 1e-9) return c > 0 ? [[1,0,0],[0,1,0],[0,0,1]] : [[1,0,0],[0,-1,0],[0,0,-1]];
+  const K = [[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]];
+  const K2 = K.map((r, i) => [0, 1, 2].map(j => r[0] * K[0][j] + r[1] * K[1][j] + r[2] * K[2][j]));
+  const f = (1 - c) / (s * s);
+  return [0, 1, 2].map(i => [0, 1, 2].map(j => (i === j ? 1 : 0) + K[i][j] + K2[i][j] * f));
+}
+const mul = (R, p) => [dot(R[0], p), dot(R[1], p), dot(R[2], p)];
+
+function convert(objText, opts) {
+  const { V, T, N, F } = parseOBJ(objText);
+  if (!V.length || !F.length) throw new Error("O arquivo .obj está vazio ou não é um modelo 3D.");
+  let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (const v of V) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], v[k]); mx[k] = Math.max(mx[k], v[k]); }
+  const diag = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+  let P = V, NN = N, faces = F, info = { table: false };
+  if (opts.removeTable) {
+    const t = findTable(V, diag);
+    if (t.share > 0.15) {
+      const R = rotToUp(t.n);
+      P = V.map(v => mul(R, sub(v, t.a))); NN = N.map(n => mul(R, n));
+      faces = F.filter(f => Math.max(P[f[0][0]][1], P[f[1][0]][1], P[f[2][0]][1]) > diag * 0.0104);
+      info.table = true;
+    }
+  }
+  if (opts.removeBits && faces.length) {
+    const par = Array.from(V, (_, i) => i);
+    const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    for (const f of faces) { const r = find(f[0][0]); par[find(f[1][0])] = r; par[find(f[2][0])] = find(f[0][0]); }
+    const cnt = new Map(); for (const f of faces) { const r = find(f[0][0]); cnt.set(r, (cnt.get(r) || 0) + 1); }
+    let root = -1, bc = -1; for (const [r, c] of cnt) if (c > bc) { bc = c; root = r; }
+    faces = faces.filter(f => find(f[0][0]) === root);
+  }
+  if (!faces.length) throw new Error("Não sobrou nada depois de remover a mesa. Desmarque a opção e tente de novo.");
+  // vértices únicos
+  const map = new Map(), pos = [], uv = [], nor = [], ind = [];
+  for (const f of faces) for (const [vi, ti, ni] of f) {
+    const key = vi + "/" + ti + "/" + ni; let id = map.get(key);
+    if (id === undefined) { id = pos.length; map.set(key, id); pos.push(P[vi]); uv.push(ti >= 0 ? T[ti] : [0, 0]); nor.push(ni >= 0 ? norm(NN[ni]) : [0, 1, 0]); }
+    ind.push(id);
+  }
+  mn = [Infinity, Infinity, Infinity]; mx = [-Infinity, -Infinity, -Infinity];
+  for (const v of pos) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], v[k]); mx[k] = Math.max(mx[k], v[k]); }
+  const ext = [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
+  const ref = opts.axis === "height" ? ext[1] : Math.max(...ext);
+  const scale = (opts.sizeCm / 100) / ref;
+  const off = [(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2];
+  const posA = new Float32Array(pos.length * 3), norA = new Float32Array(pos.length * 3), uvA = new Float32Array(pos.length * 2);
+  pos.forEach((p, i) => { for (let k = 0; k < 3; k++) { posA[i * 3 + k] = (p[k] - off[k]) * scale; norA[i * 3 + k] = nor[i][k]; } uvA[i * 2] = uv[i][0]; uvA[i * 2 + 1] = 1 - uv[i][1]; });
+  info.size = ext.map(e => e * scale); info.tris = ind.length / 3;
+  return { posA, norA, uvA, indA: new Uint32Array(ind), info };
+}
+
+function buildGLB(m, img) { // img: {bytes: Uint8Array, mime} ou null
+  const parts = [], views = []; let len = 0;
+  const push = (arr, target) => { const pad = (4 - len % 4) % 4; if (pad) { parts.push(new Uint8Array(pad)); len += pad; }
+    const u = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength); const v = { buffer: 0, byteOffset: len, byteLength: u.byteLength }; if (target) v.target = target;
+    parts.push(u); len += u.byteLength; views.push(v); return views.length - 1; };
+  let pmn = [Infinity, Infinity, Infinity], pmx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < m.posA.length; i += 3) for (let k = 0; k < 3; k++) { pmn[k] = Math.min(pmn[k], m.posA[i + k]); pmx[k] = Math.max(pmx[k], m.posA[i + k]); }
+  const n = m.posA.length / 3;
+  const acc = [
+    { bufferView: push(m.posA, 34962), componentType: 5126, count: n, type: "VEC3", min: pmn, max: pmx },
+    { bufferView: push(m.norA, 34962), componentType: 5126, count: n, type: "VEC3" },
+    { bufferView: push(m.uvA, 34962), componentType: 5126, count: n, type: "VEC2" },
+    { bufferView: push(m.indA, 34963), componentType: 5125, count: m.indA.length, type: "SCALAR" }];
+  const mat = { name: "produto", pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 0.8 } };
+  const g = { asset: { version: "2.0", generator: "Conversor Mesa 3D" }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, name: "produto" }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3, material: 0 }] }], materials: [mat], accessors: acc };
+  if (img) {
+    const iv = push(img.bytes);
+    g.images = [{ bufferView: iv, mimeType: img.mime }]; g.samplers = [{ magFilter: 9729, minFilter: 9987 }]; g.textures = [{ source: 0, sampler: 0 }];
+    mat.pbrMetallicRoughness.baseColorTexture = { index: 0 };
+  }
+  const pad = (4 - len % 4) % 4; if (pad) { parts.push(new Uint8Array(pad)); len += pad; }
+  g.bufferViews = views; g.buffers = [{ byteLength: len }];
+  let js = new TextEncoder().encode(JSON.stringify(g)); const jp = (4 - js.length % 4) % 4;
+  if (jp) { const t = new Uint8Array(js.length + jp).fill(0x20); t.set(js); js = t; }
+  const out = new Uint8Array(12 + 8 + js.length + 8 + len), dv = new DataView(out.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out.length, true);
+  dv.setUint32(12, js.length, true); dv.setUint32(16, 0x4E4F534A, true); out.set(js, 20);
+  let o = 20 + js.length; dv.setUint32(o, len, true); dv.setUint32(o + 4, 0x004E4942, true); o += 8;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+if (typeof module !== "undefined") module.exports = { convert, buildGLB };
+</script>
+
+<script>
+// ===== interface =====
+const $ = id => document.getElementById(id);
+let files = { obj: null, mtl: null, imgs: [] }, glbUrl = null, glbBytes = null;
+const log = (t, err) => { $("log").textContent = t; $("log").classList.toggle("err", !!err); };
+
+async function takeFiles(list) {
+  files = { obj: null, mtl: null, imgs: [] };
+  for (const f of list) {
+    const name = f.name.toLowerCase();
+    if (name.endsWith(".zip")) {
+      try {
+        const z = await JSZip.loadAsync(f);
+        for (const e of Object.values(z.files)) {
+          if (e.dir) continue; const n = e.name.split("/").pop(), ln = n.toLowerCase();
+          if (ln.endsWith(".obj")) files.obj = { name: n, text: await e.async("string") };
+          else if (ln.endsWith(".mtl")) files.mtl = { name: n, text: await e.async("string") };
+          else if (/\.(jpe?g|png)$/.test(ln)) files.imgs.push({ name: n, bytes: await e.async("uint8array") });
+        }
+      } catch (e) { log("Não consegui abrir esse .zip. Tente extrair e arrastar os 3 arquivos.", true); }
+    }
+    else if (name.endsWith(".obj")) files.obj = { name: f.name, text: await f.text() };
+    else if (name.endsWith(".mtl")) files.mtl = { name: f.name, text: await f.text() };
+    else if (/\.(jpe?g|png)$/.test(name)) files.imgs.push({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) });
+  }
+  if (files.obj) { const base = files.obj.name.replace(/\.obj$/i, "").replace(/[^\w-]+/g, "-").toLowerCase(); if ($("name").value === "meu-produto" && base && base !== "3dmodel") $("name").value = base; }
+  const tex = pickTexture();
+  $("files").innerHTML = [
+    `<li class="${files.obj ? "ok" : "miss"}">Forma (.obj)${files.obj ? ": " + files.obj.name : " faltando"}</li>`,
+    `<li class="${tex ? "ok" : "miss"}">Textura (imagem)${tex ? ": " + tex.name : " faltando, o produto fica sem cor"}</li>`,
+    `<li class="${files.mtl ? "ok" : "miss"}">Material (.mtl)${files.mtl ? ": " + files.mtl.name : " opcional"}</li>`].join("");
+  $("go").disabled = !files.obj;
+  if (files.obj) log("Arquivos prontos. Confira a medida real e clique em Converter.");
+}
+function pickTexture() {
+  if (!files.imgs.length) return null;
+  const m = files.mtl && files.mtl.text.match(/map_Kd\s+(.+)/i);
+  if (m) { const want = m[1].trim().split(/[\\/]/).pop().toLowerCase(); const hit = files.imgs.find(i => i.name.toLowerCase() === want); if (hit) return hit; }
+  return files.imgs[0];
+}
+
+const drop = $("drop");
+drop.addEventListener("click", () => $("pick").click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("pick").click(); } });
+$("pick").addEventListener("change", e => takeFiles([...e.target.files]));
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => takeFiles([...e.dataTransfer.files]));
+
+$("go").addEventListener("click", () => {
+  const size = parseFloat($("size").value);
+  if (!(size > 0)) { log("Informe a medida real em centímetros.", true); return; }
+  log("Convertendo…"); $("go").disabled = true;
+  setTimeout(() => {
+    try {
+      const m = convert(files.obj.text, { removeTable: $("table").checked, removeBits: $("bits").checked, sizeCm: size, axis: $("axis").value });
+      const tex = pickTexture();
+      const mime = tex && /\.png$/i.test(tex.name) ? "image/png" : "image/jpeg";
+      glbBytes = buildGLB(m, tex ? { bytes: tex.bytes, mime } : null);
+      if (glbUrl) URL.revokeObjectURL(glbUrl);
+      glbUrl = URL.createObjectURL(new Blob([glbBytes], { type: "model/gltf-binary" }));
+      $("mv").src = glbUrl; $("empty").hidden = true;
+      const [x, y, z] = m.info.size.map(v => (v * 100).toFixed(1).replace(".", ","));
+      $("stats").innerHTML = `<span>Tamanho <b>${x} × ${y} × ${z} cm</b></span><span>Arquivo <b>${(glbBytes.length / 1048576).toFixed(2).replace(".", ",")} MB</b></span><span>Mesa <b>${m.info.table ? "removida" : "não encontrada"}</b></span>`;
+      $("save").disabled = false;
+      log(glbBytes.length > 3 * 1048576 ? "Pronto, mas o arquivo passou de 3 MB e pode demorar no 4G." : "Pronto! Confira a prévia e clique em Baixar GLB.");
+    } catch (e) { log(e.message || "Algo deu errado na conversão.", true); }
+    $("go").disabled = false;
+  }, 30);
+});
+$("save").addEventListener("click", () => {
+  if (!glbUrl) return;
+  const a = document.createElement("a"); a.href = glbUrl;
+  a.download = ($("name").value.trim().replace(/[^\w-]+/g, "-").toLowerCase() || "produto") + ".glb";
+  document.body.appendChild(a); a.click(); a.remove();
+});
+</script>
+</body>
+</html>
